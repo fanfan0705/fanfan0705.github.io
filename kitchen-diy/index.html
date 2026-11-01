@@ -242,6 +242,14 @@ main.drawer-panel #fab{opacity:0;visibility:hidden}
   .lib-grid{grid-template-columns:1fr 1fr 1fr}
   .brand span,footer .only2d{display:none!important}
 }
+.dxf-mask{position:fixed;inset:0;z-index:99;background:rgba(38,36,31,.45);display:flex;align-items:center;justify-content:center}
+.dxf-dlg{background:var(--panel);border-radius:14px;padding:20px 22px;width:min(440px,92vw);max-height:82vh;overflow:auto;box-shadow:0 14px 44px rgba(0,0,0,.3)}
+.dxf-dlg h3{margin:0 0 8px}
+.dxf-layers{margin:10px 0;display:flex;flex-direction:column;gap:6px;max-height:38vh;overflow:auto;padding:2px}
+.dxf-layers label{display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer}
+.dxf-layers .muted{margin-left:auto}
+.dxf-row{display:flex;justify-content:space-between;align-items:center;margin:12px 0;font-size:14px;gap:10px}
+.dxf-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 </style>
 <script type="importmap">
 {"imports":{
@@ -323,9 +331,11 @@ main.drawer-panel #fab{opacity:0;visibility:hidden}
         <button class="btn" id="exportPng" data-en="Export image">导出图片</button>
         <button class="btn" id="exportJson" data-en="Export plan JSON">导出方案 JSON</button>
         <button class="btn" id="importJson" data-en="Import plan">导入方案</button>
+        <button class="btn" id="importDxf" data-en="Import DXF floor plan">导入 DXF 户型</button>
         <button class="btn danger" id="reset" data-en="Reset to default">重置为默认方案</button>
       </div></details>
     <input type="file" id="fileIn" accept=".json,application/json" hidden>
+    <input type="file" id="dxfIn" accept=".dxf" hidden>
   </header>
 
   <aside class="lib">
@@ -386,6 +396,7 @@ main.drawer-panel #fab{opacity:0;visibility:hidden}
 </div>
 <div id="toast"></div>
 
+<script src="./vendor/dxf-parser.js"></script>
 <script>
 /* ======================= 多语言（中文 / English，默认中文） ======================= */
 const LANG_KEY = 'huxing-lang';
@@ -539,7 +550,7 @@ function useTemplate(id){
 function startOver(){
   if (!WALLS.length && !state.furniture.length) return;
   if (!confirm(tr('清空墙体、家具与测量线，回到空白画布？（可撤销）', 'Clear walls, furniture and measurements, back to a blank canvas? (undoable)'))) return;
-  ui.sel = null; ui.wallSel = null;
+  ui.sel = null; ui.wallSel = null; ui.welOff = false;
   mutate(() => { state.layout = null; state.furniture = []; state.demolished = []; state.measures = []; });
   applyLayout(); renderAll(); fitView();
 }
@@ -1027,6 +1038,8 @@ function renderPanel(){
   const p = $('#panel');
   if (ui.sel?.kind === 'furn'){ const f = getF(ui.sel.id); if (f){ p.innerHTML = furnPanel(f); bindFurnPanel(f); return; } }
   if (ui.sel?.kind === 'room'){ p.innerHTML = roomPanel(ROOMS.find(r => r.id === ui.sel.id)); bindRoomPanel(); return; }
+  const wi = ui.wallSel ? +ui.wallSel.slice(1) : -1;
+  if (wi >= 0 && WALLS[wi]){ p.innerHTML = wallPanel(wi, WALLS[wi]); bindWallPanel(wi); return; }
   p.innerHTML = overviewPanel(); bindOverview();
 }
 
@@ -1086,7 +1099,7 @@ function applyFloorColor(hex){
   Object.keys(state.rooms).forEach(id => state.rooms[id].mat = 'custom');
   save(); buildDefs(); renderRooms(); window.View3D?.sync();
 }
-function syncWelcome(){ const w = $('#welcome'); if (w) w.hidden = WALLS.length > 0; }
+function syncWelcome(){ const w = $('#welcome'); if (w) w.hidden = WALLS.length > 0 || ui.welOff === true; }
 
 function overviewPanel(){
   const rows = ROOMS.map(r => {
@@ -1285,12 +1298,41 @@ function bindFurnPanel(f){
   $('#back').onclick = () => select(null);
 }
 
+/* ---------- 墙体属性面板 ---------- */
+const WALL_TYPES = {e: ['外墙', 'Exterior'], b: ['承重墙', 'Bearing'], n: ['内墙', 'Interior'], low: ['矮墙', 'Half wall']};
+function wallPanel(idx, w){
+  const horiz = (w[2]-w[0]) >= (w[3]-w[1]);
+  const len = Math.round(horiz ? w[2]-w[0] : w[3]-w[1]);
+  const th = Math.round(horiz ? w[3]-w[1] : w[2]-w[0]);
+  return `<section><h3>${tr('墙体属性','Wall')}</h3>
+    <div class="form">
+      <label class="full">${tr('长度','Length')} (mm)<input type="number" id="wLen" value="${len}" min="300" step="50"></label>
+      <label>${tr('位置','Position')} X (mm)<input type="number" id="wX" value="${Math.round(w[0])}" step="50"></label>
+      <label>Y (mm)<input type="number" id="wY" value="${Math.round(w[1])}" step="50"></label>
+      <label class="full">${tr('类型','Type')}<select id="wType">${Object.keys(WALL_TYPES).map(k => `<option value="${k}" ${w[4]===k?'selected':''}>${tr(WALL_TYPES[k][0], WALL_TYPES[k][1])}</option>`).join('')}</select></label>
+    </div>
+    <div class="muted" style="margin-top:8px">${horiz ? tr('水平墙','Horizontal') : tr('垂直墙','Vertical')} · ${tr('厚度','Thickness')} ${th} mm</div>
+    <div class="actions">
+      <button class="btn danger" id="aDel">${tr('删除','Delete')}</button><button class="btn" id="back">${tr('← 返回','← Back')}</button>
+    </div></section>
+  <section class="muted" style="font-size:12px">${tr('改长度后回车，墙从固定端向另一端变长 / 变短；相邻墙体不会自动跟随，需要时逐面微调。','Press Enter after typing a length — the wall grows / shrinks from its fixed end. Adjacent walls do not follow; nudge them as needed.')}</section>`;
+}
+function bindWallPanel(idx){
+  const upd = fn => mutate(() => { const w = state.layout?.walls?.[idx]; if (w) fn(w); });
+  $('#wLen').onchange = e => { const v = Math.max(300, Math.round(parseFloat(e.target.value) || 0)); upd(w => { if ((w[2]-w[0]) >= (w[3]-w[1])) w[2] = w[0] + v; else w[3] = w[1] + v; }); };
+  $('#wX').onchange = e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(w => { const d = v - w[0]; w[0] += d; w[2] += d; }); };
+  $('#wY').onchange = e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(w => { const d = v - w[1]; w[1] += d; w[3] += d; }); };
+  $('#wType').onchange = e => upd(w => w[4] = e.target.value);
+  $('#aDel').onclick = deleteSel;
+  $('#back').onclick = () => { ui.wallSel = null; renderWalls(); renderPanel(); };
+}
+
 /* ======================= 操作 ======================= */
 function select(sel){ ui.sel = sel; renderSel(); renderPanel(); }
 function rotateSel(d){ if (ui.sel?.kind==='furn') mutate(() => { const f = getF(ui.sel.id); f.rot = norm(f.rot + d); }); }
 function deleteSel(){
   if (ui.sel?.kind==='furn'){ const id = ui.sel.id; ui.sel = null; mutate(() => state.furniture = state.furniture.filter(f => f.id !== id)); return; }
-  if (ui.tool === 'draw' && ui.wallSel){
+  if (ui.wallSel){
     const idx = +ui.wallSel.slice(1); ui.wallSel = null;
     mutate(() => { state.layout.walls.splice(idx, 1); state.demolished = []; });
     applyLayout(); toast(tr('已删除墙体', 'Wall deleted'));
@@ -1492,9 +1534,14 @@ svg.addEventListener('pointerdown', e => {
     toggleWall(t.closest('[data-wall]').dataset.wall); return;
   } else if (ui.tool === 'select' && t.closest('[data-fid]')){
     const f = getF(t.closest('[data-fid]').dataset.fid);
+    if (ui.wallSel){ ui.wallSel = null; renderWalls(); }
     if (ui.sel?.id !== f.id) select({kind:'furn', id:f.id});
     drag = {kind:'move', id:f.id, sx:e.clientX, sy:e.clientY, ox:p.x-f.cx, oy:p.y-f.cy, before:snap(), moved:false};
+  } else if (ui.tool === 'select' && t.closest('[data-wall]')){
+    ui.sel = null; ui.wallSel = t.closest('[data-wall]').dataset.wall;
+    drag = null; renderWalls(); renderSel(); renderPanel(); return;
   } else {
+    if (ui.tool === 'select' && ui.wallSel){ ui.wallSel = null; renderWalls(); renderPanel(); }
     const room = t.closest('[data-room]');
     drag = {kind:'pan', sx:e.clientX, sy:e.clientY, x0:view.x0, y0:view.y0, room:room && room.dataset.room, moved:false};
   }
@@ -1767,10 +1814,106 @@ $('#fileIn').onchange = e => {
   });
   e.target.value = '';
 };
-$('#reset').onclick = () => { if (confirm(tr('恢复为空白初始状态？（可撤销）', 'Reset to a blank canvas? (undoable)'))){ const b = snap(); state = defaultState(); ui.sel = null; ui.wallSel = null; applyLayout(); commit(b); renderAll(); fitView(); } };
+/* ---------- DXF 户型导入：直线 / 多段线 → 墙体（自动翻转 Y 轴、识别单位、合并双线） ---------- */
+$('#importDxf').onclick = () => $('#dxfIn').click();
+$('#dxfIn').onchange = e => {
+  const file = e.target.files[0]; if (!file) return;
+  file.text().then(txt => { try { importDxf(txt); } catch(err){ console.error(err); toast(tr('DXF 解析失败：文件可能损坏或版本不受支持', 'Failed to parse DXF — file may be corrupt or unsupported')); } });
+  e.target.value = '';
+};
+function importDxf(txt){
+  if (typeof DxfParser === 'undefined') return toast(tr('解析库未加载，请检查 vendor/dxf-parser.js', 'Parser library missing: vendor/dxf-parser.js'));
+  const dxf = new DxfParser().parseSync(txt);
+  if (!dxf || !Array.isArray(dxf.entities)) throw 0;
+  const segs = [];
+  const add = (a, b, layer) => { if (a && b && isFinite(+a.x) && isFinite(+a.y) && isFinite(+b.x) && isFinite(+b.y)) segs.push({a:[+a.x, +a.y], b:[+b.x, +b.y], layer: layer || '0'}); };
+  for (const en of dxf.entities){
+    if (en.type === 'LINE' && en.vertices?.length >= 2) add(en.vertices[0], en.vertices[1], en.layer);
+    else if ((en.type === 'LWPOLYLINE' || en.type === 'POLYLINE') && en.vertices?.length >= 2){
+      for (let i = 0; i < en.vertices.length - 1; i++) add(en.vertices[i], en.vertices[i+1], en.layer);
+      if (en.shape && en.vertices.length > 2) add(en.vertices[en.vertices.length-1], en.vertices[0], en.layer);
+    }
+  }
+  if (!segs.length) return toast(tr('未找到直线 / 多段线——请在 CAD 里确认墙体是用线画的', 'No LINE/POLYLINE found — check how walls were drawn in CAD'));
+  const counts = {};
+  segs.forEach(s => counts[s.layer] = (counts[s.layer] || 0) + 1);
+  showDxfDialog(Object.keys(counts).sort((a,b) => counts[b]-counts[a]), counts, (sel, scale) => {
+    const walls = dxfToWalls(segs.filter(s => sel.has(s.layer)), scale);
+    if (!walls.length) return toast(tr('所选图层里没有横平竖直的墙体线（斜墙 / 弧线暂不支持）', 'No axis-aligned wall lines in selected layers (diagonal/arc walls not supported yet)'));
+    mutate(() => { state.layout = {walls, wins:[], doors:[], slides:[], rooms:[]}; state.furniture = []; state.demolished = []; state.measures = []; });
+    applyLayout(); fitView();
+    toast(tr(`已导入 ${walls.length} 面墙体，点墙可修改尺寸`, `Imported ${walls.length} walls — click a wall to edit`));
+  });
+}
+function dxfToWalls(segs, scale){
+  const T = 240;
+  let lines = [];
+  for (const s of segs){
+    const ax = s.a[0]*scale, bx = s.b[0]*scale, ay = -s.a[1]*scale, by = -s.b[1]*scale;
+    const dx = bx-ax, dy = by-ay, len = Math.hypot(dx, dy);
+    if (len < 300) continue;
+    if (Math.abs(dy) <= Math.abs(dx)*0.02) lines.push({d:'h', c:(ay+by)/2, s:Math.min(ax,bx), e:Math.max(ax,bx)});
+    else if (Math.abs(dx) <= Math.abs(dy)*0.02) lines.push({d:'v', c:(ax+bx)/2, s:Math.min(ay,by), e:Math.max(ay,by)});
+  }
+  if (!lines.length) return [];
+  // 1) 共线碎段合并：同向、同一直线（±2mm）、相接或重叠
+  lines.sort((p,q) => p.d === q.d ? (p.c - q.c || p.s - q.s) : (p.d < q.d ? -1 : 1));
+  const col = [];
+  for (const l of lines){
+    const last = col[col.length-1];
+    if (last && last.d === l.d && Math.abs(last.c - l.c) <= 2 && l.s <= last.e + 10){ last.e = Math.max(last.e, l.e); last.c = (last.c + l.c)/2; }
+    else col.push({...l});
+  }
+  // 2) 墙双线配对：同向、间距 100–450mm、重叠足够 → 合并取中线
+  const used = new Array(col.length).fill(false), out = [];
+  for (let i = 0; i < col.length; i++){
+    if (used[i]) continue;
+    used[i] = true;
+    const a = col[i];
+    let best = -1;
+    for (let j = i+1; j < col.length; j++){
+      if (used[j] || col[j].d !== a.d) continue;
+      const gap = Math.abs(col[j].c - a.c);
+      if (gap > 450) break;
+      if (gap < 100) continue;
+      const ov = Math.min(a.e, col[j].e) - Math.max(a.s, col[j].s);
+      if (ov > Math.min(a.e-a.s, col[j].e-col[j].s)*0.4){ best = j; break; }
+    }
+    if (best >= 0){ used[best] = true; out.push({d:a.d, c:(a.c+col[best].c)/2, s:Math.min(a.s, col[best].s), e:Math.max(a.e, col[best].e)}); }
+    else out.push(a);
+  }
+  // 3) 平移到原点附近 + 生成墙矩形（厚 240）
+  const minX = Math.min(...out.map(l => l.d === 'h' ? l.s : l.c - T/2));
+  const minY = Math.min(...out.map(l => l.d === 'v' ? l.s : l.c - T/2));
+  return out.map(l => l.d === 'h'
+    ? [Math.round(l.s-minX), Math.round(l.c-minY-T/2), Math.round(l.e-minX), Math.round(l.c-minY+T/2), 'n']
+    : [Math.round(l.c-minX-T/2), Math.round(l.s-minY), Math.round(l.c-minX+T/2), Math.round(l.e-minY), 'n']);
+}
+function showDxfDialog(layers, counts, cb){
+  closeDxfDialog();
+  const o = document.createElement('div');
+  o.className = 'dxf-mask';
+  o.innerHTML = `<div class="dxf-dlg">
+    <h3>${tr('导入 DXF 户型','Import DXF floor plan')}</h3>
+    <p class="muted" style="font-size:13px;margin:0 0 6px">${tr('勾选包含墙体的图层；只识别直线与多段线，斜线和弧线会被忽略。','Select the wall layers. Only LINE / POLYLINE are read; diagonal and arc lines are ignored.')}</p>
+    <div class="dxf-layers">${layers.map(l => `<label><input type="checkbox" value="${esc(l)}" checked><span>${esc(l) || '0'}</span><span class="muted">${counts[l]} ${tr('段','segs')}</span></label>`).join('')}</div>
+    <label class="dxf-row"><span>${tr('图纸单位','Drawing units')}</span><select id="dxfUnit"><option value="1" selected>${tr('毫米 mm','Millimeters')}</option><option value="10">${tr('厘米 cm','Centimeters')}</option><option value="1000">${tr('米 m','Meters')}</option></select></label>
+    <div class="dxf-actions"><button class="btn" id="dxfCancel">${tr('取消','Cancel')}</button><button class="btn primary" id="dxfOk">${tr('导入','Import')}</button></div>
+  </div>`;
+  document.body.appendChild(o);
+  o.querySelector('#dxfCancel').onclick = closeDxfDialog;
+  o.addEventListener('pointerdown', e => { if (e.target === o) closeDxfDialog(); });
+  o.querySelector('#dxfOk').onclick = () => {
+    const sel = new Set([...o.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value));
+    const scale = parseFloat(o.querySelector('#dxfUnit').value) || 1;
+    closeDxfDialog(); cb(sel, scale);
+  };
+}
+function closeDxfDialog(){ document.querySelector('.dxf-mask')?.remove(); }
+$('#reset').onclick = () => { if (confirm(tr('恢复为空白初始状态？（可撤销）', 'Reset to a blank canvas? (undoable)'))){ const b = snap(); state = defaultState(); ui.sel = null; ui.wallSel = null; ui.welOff = false; applyLayout(); commit(b); renderAll(); fitView(); } };
 // 空白引导层 + 顶部「户型 / 配色」入口
-$('#welTpl').onclick = () => { select(null); drawer('panel', true); setTimeout(() => $('#secLayout')?.scrollIntoView({behavior:'smooth', block:'start'}), 60); };
-$('#welDraw').onclick = () => { setTool('draw'); drawer(null); };
+$('#welTpl').onclick = () => { ui.welOff = true; syncWelcome(); select(null); drawer('panel', true); setTimeout(() => $('#secLayout')?.scrollIntoView({behavior:'smooth', block:'start'}), 60); };
+$('#welDraw').onclick = () => { ui.welOff = true; syncWelcome(); setTool('draw'); drawer(null); toast(tr('在画布上按住拖动，画出第一面墙', 'Drag on the canvas to draw your first wall')); };
 $('#btnLayout').onclick = () => { select(null); drawer('panel', true); setTimeout(() => $('#secLayout')?.scrollIntoView({behavior:'smooth', block:'start'}), 60); };
 $('#btnPalette').onclick = () => { select(null); drawer('panel', true); setTimeout(() => $('#secPal')?.scrollIntoView({behavior:'smooth', block:'start'}), 60); };
 // 横竖屏切换、表头换行等都会改变画布尺寸；尺寸从 0 恢复（如首次布局）时重新适应窗口
