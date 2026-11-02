@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#fffdf9">
-<title>厨房 DIY 设计 v11.01h</title>
+<title>厨房 DIY 设计 v11.05</title>
 <style>
 :root{
   --bg:#f3efe7; --paper:#f7f4ee; --panel:#fffdf9; --line:#e3dccf; --ink:#2b2824; --muted:#8a8174;
@@ -279,6 +279,7 @@ body.editing .item::after{content:'✎';position:absolute;top:2px;right:4px;font
 #cfgEdit h5{margin:0 0 12px;font-size:15px;color:#3d3a34}
 #cfgEdit label{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;font-size:13px;color:#8a8378;gap:8px}
 #cfgEdit input[type=text],#cfgEdit input[type=number]{flex:1;min-width:0;padding:7px 9px;border:1px solid #d8d2c4;border-radius:7px;font-size:14px;background:#fff;color:#3d3a34;outline:none}
+#cfgEdit textarea{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #d8d2c4;border-radius:7px;font-size:13px;background:#fff;color:#3d3a34;outline:none;font-family:inherit;resize:vertical}
 #cfgEdit input[type=color]{width:52px;height:30px;padding:2px;border:1px solid #d8d2c4;border-radius:7px;background:#fff;cursor:pointer}
 #cfgEdit select{flex:1;padding:7px;border:1px solid #d8d2c4;border-radius:7px;font-size:13px;background:#fff;color:#3d3a34}
 #cfgEdit .row{display:flex;gap:8px;margin-top:12px}
@@ -287,7 +288,7 @@ body.editing .item::after{content:'✎';position:absolute;top:2px;right:4px;font
 #cfgEdit .cancel{background:#eee9df;color:#6b6455}
 #cfgEdit .danger{background:#b04a3a;color:#fff}
 body.editing .brand b,body.editing #subtitle{cursor:pointer;outline:1px dashed #b5653a;outline-offset:2px;border-radius:3px}
-#verBadge{position:fixed;right:8px;bottom:6px;font-size:11px;color:#b8b2a6;z-index:98;pointer-events:none;font-family:monospace}
+#verBadge{position:fixed;right:8px;bottom:6px;font-size:11px;color:#b8b2a6;z-index:98;pointer-events:auto;font-family:monospace;user-select:none;-webkit-user-select:none}
 #verNew{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:999;background:#b5653a;color:#fff;padding:9px 20px;border-radius:22px;font-size:13px;cursor:pointer;box-shadow:0 6px 20px rgba(61,58,52,.3)}
 </style>
 <script type="importmap">
@@ -536,6 +537,30 @@ const TEMPLATES = [
   {id:'uu',  name:'U 型',  size:'3200 × 2050', make:TPL_U},
   {id:'er',  name:'二字型', size:'3600 × 2400', make:TPL_II},
 ];
+// 通用矩形户型生成器（自定义/改尺寸户型：顶墙居中窗 + 底墙居中门）
+function genRectTpl(W, D){
+  const winW = Math.max(600, Math.min(1500, W - 1200)), doorW = Math.min(800, W - 1400);
+  const wx0 = (W - winW)/2, wx1 = (W + winW)/2, dx0 = (W - doorW)/2, dx1 = (W + doorW)/2;
+  return {
+    walls: [
+      [-240,-240, wx0, 0, 'e'], [wx1, -240, W+240, 0, 'e'],
+      [-240, D, dx0, D+240, 'e'], [dx1, D, W+240, D+240, 'e'],
+      [-240, 0, 0, D+240, 'e'], [W, -240, W+240, D, 'e'],
+    ],
+    wins: [[wx0, -240, wx1, 0]],
+    doors: [{name:'厨房门', rect:[dx0, D, dx1, D+240], h:[dx1, D], c:[-1,0], o:[0,-1], len:doorW, entry:true}],
+    slides: [],
+    rooms: [{id:'kitchen', name:'厨房', poly:R(0,0,W,D), mat:'antislip', at:[W/2, D/2]}],
+  };
+}
+const BUILTIN_MAKE = {yi: TPL_I, ll: TPL_L, uu: TPL_U, er: TPL_II};
+TEMPLATES.forEach(t => {
+  const dims = {'yi':[3600,2100], 'll':[3200,2400], 'uu':[3200,2050], 'er':[3600,2400]}[t.id];
+  if (dims){ t.w = dims[0]; t.d = dims[1]; t.w0 = dims[0]; t.d0 = dims[1]; }
+});
+// 面板区块与自定义文字的默认配置（管理后台可改）
+const SEC_CFG = { stats: {hide: false, title: ''}, help: {hide: false, title: ''} };
+const TEXT_CFG = { brand: '', subtitle: '' };
 // 3D 模块通过这里读取当前户型与视图中心
 window.L = {walls:WALLS, wins:WINS, doors:DOORS, slides:SLIDES, rooms:ROOMS};
 // 墙体围合出的净内皮矩形（四边均有墙覆盖时返回 [ix0,iy0,ix1,iy1]，否则 null）
@@ -675,7 +700,7 @@ const snap = () => JSON.stringify(state);
 function commit(before){ undoStack.push(before); if (undoStack.length > 150) undoStack.shift(); redoStack.length = 0; save(); }
 function mutate(fn){ const b = snap(); fn(); commit(b); renderAll(); }
 // 版本号：每次发布新版递增；页面加载 3 秒后自检线上是否有更新（解决缓存旧版问题）
-const APP_VER = '11.01h';
+const APP_VER = '11.05';
 setTimeout(async () => {
   try{
     const t = await (await fetch(location.pathname.replace(/[^/]*$/, '') + '?_v=' + Date.now(), {cache:'no-store'})).text();
@@ -1482,7 +1507,7 @@ function updateHeader(){
   const tot = ROOMS.filter(r => r.counted !== false).reduce((a,r) => a + area(r.poly), 0);
   $('#subtitle').textContent = ROOMS.length
     ? tr(`厨房净面积约 ${fmt(tot)} m² · 尺寸单位 mm · 打造你的理想厨房`, `Kitchen area ≈ ${fmt(tot)} m² · Units: mm · Build your dream kitchen`)
-    : tr('从户型模板或手绘墙体开始 · 尺寸单位 mm', 'Start from a layout template or draw walls · Units: mm');
+    : (TEXT_CFG.subtitle || tr('从户型模板或手绘墙体开始 · 尺寸单位 mm', 'Start from a layout template or draw walls · Units: mm'));
   $('#undo').disabled = !undoStack.length; $('#redo').disabled = !redoStack.length;
   $('#undo').style.opacity = undoStack.length ? 1 : .4; $('#redo').style.opacity = redoStack.length ? 1 : .4;
 }
@@ -1584,12 +1609,12 @@ function overviewPanel(){
   ${ROOMS.length ? `<section><h3>${tr('地面材料面积','Flooring Areas')} <small>${tr('按房间净面积统计','by net room area')}</small></h3>
     <table>${matRows}</table>
     <div class="total"><span>${tr('地面总面积','Total floor area')}</span><b>${fmt(tot)} m²</b></div></section>` : ''}
-  <section><h3>${tr('方案统计','Plan Stats')}</h3>
+  ${SEC_CFG.stats.hide ? '' : `<section><h3>${SEC_CFG.stats.title || tr('方案统计','Plan Stats')}</h3>
     <div class="stats"><div><small>${tr('家具数量','Furniture')}</small><span class="big">${state.furniture.length}</span></div>
       <div><small>${tr('拆除墙体','Walls removed')}</small><span class="big">${fmt(demLen,1)}</span> m</div></div>
     <div class="actions"><button class="btn" id="clearMeasure">${tr('清除测量','Clear measures')} (${state.measures.length})</button>
-      <button class="btn danger" id="clearFurn">${tr('清空布置','Clear layout')}</button></div></section>
-  ${COARSE ? tr(`<section><h3>触屏操作</h3><div class="kbd">
+      <button class="btn danger" id="clearFurn">${tr('清空布置','Clear layout')}</button></div></section>`}
+  ${SEC_CFG.help.hide ? '' : COARSE ? tr(`<section><h3>${SEC_CFG.help.title || '触屏操作'}</h3><div class="kbd">
     <kbd>单指拖动</kbd><span>空白处平移画面</span><kbd>双指</kbd><span>捏合缩放、拖动平移</span>
     <kbd>家具库</kbd><span>点一下放到画面中央，或按住向右拖到指定位置</span>
     <kbd>点家具</kbd><span>选中后拖动移动；拖顶部圆点旋转、右下方块改尺寸</span>
@@ -1604,7 +1629,7 @@ function overviewPanel(){
     <kbd>Measure</kbd><span>Hold and drag a line, or tap two points</span>
     <kbd>3D walk</kbd><span>Joystick moves, drag to look, tap doors to open</span>
   </div></section>`) : ''}
-  ${tr(`<section><h3>键盘快捷键</h3><div class="kbd">
+  ${SEC_CFG.help.hide ? '' : tr(`<section><h3>${SEC_CFG.help.title || '键盘快捷键'}</h3><div class="kbd">
     <kbd>拖拽</kbd><span>左侧家具拖入平面图</span><kbd>V</kbd><span>选择 / 移动</span><kbd>M</kbd><span>测量（Shift 水平/垂直）</span><kbd>D</kbd><span>手绘墙体</span>
     <kbd>X</kbd><span>拆改非承重墙（黑色为承重墙）</span><kbd>R</kbd><span>旋转 90°（Shift 反向）</span><kbd>方向键</kbd><span>微调 10mm（Shift 100mm）</span>
     <kbd>⌘/Ctrl D</kbd><span>复制</span><kbd>Delete</kbd><span>删除</span><kbd>⌘/Ctrl Z</kbd><span>撤销</span><kbd>T</kbd><span>切换 2D / 3D</span><kbd>F</kbd><span>适应窗口</span><kbd>Esc</kbd><span>取消选择</span>
@@ -2185,25 +2210,141 @@ const ICON_TYPES = [['basecab','地柜'],['wallcab','吊柜'],['tallcab','高柜
 const hex6 = c => /^#[0-9a-f]{3}$/i.test(c || '') ? '#' + [...c.slice(1)].map(x => x+x).join('') : c;
 function loadCustom(){ try{ const c = JSON.parse(localStorage.getItem(CUSTOM_KEY) || 'null'); return (c && Array.isArray(c.lib) && c.lib.length) ? c : null; }catch(_){ return null; } }
 function snapshotCustom(){
-  return { lib: LIB.map(c => ({cat: c.cat, items: c.items.map(it => it.slice())})),
-    texts: { brand: document.querySelector('.brand b')?.textContent || '', subtitle: $('#subtitle')?.textContent || '' } };
+  return {
+    lib: LIB.map(c => ({cat: c.cat, items: c.items.map(it => it.slice())})),
+    texts: { brand: TEXT_CFG.brand || document.querySelector('.brand b')?.textContent || '', subtitle: TEXT_CFG.subtitle || '' },
+    templates: TEMPLATES.map(t => ({id: t.id, name: t.name, size: t.size, w: t.w, d: t.d, custom: !!t.custom})),
+    palette: {cab: PALETTE.cab.slice(), floor: PALETTE.floor.slice(), wall: PALETTE.wall.slice(), ceil: PALETTE.ceil.slice()},
+    sections: {stats: {...SEC_CFG.stats}, help: {...SEC_CFG.help}},
+    cases: CASES_DATA ? JSON.parse(JSON.stringify(CASES_DATA)) : null,
+  };
 }
 function saveCustom(){ try{ localStorage.setItem(CUSTOM_KEY, JSON.stringify(snapshotCustom())); }catch(e){} }
-function applyCustom(){
-  const c = loadCustom(); if (!c) return;
+function applyCustomData(c){
+  if (!c || !Array.isArray(c.lib) || !c.lib.length) return;
   LIB.length = 0;
   c.lib.forEach(cat => LIB.push({cat: cat.cat, items: cat.items.map(it => it.slice())}));
   buildLib();
   if (c.texts){
-    if (c.texts.brand){ const b = document.querySelector('.brand b'); if (b){ b.textContent = c.texts.brand; b.dataset.en = c.texts.brand; } document.title = c.texts.brand; }
-    if (c.texts.subtitle){ const st = $('#subtitle'); if (st) st.textContent = c.texts.subtitle; }
+    if (c.texts.brand){ TEXT_CFG.brand = c.texts.brand; const b = document.querySelector('.brand b'); if (b){ b.textContent = c.texts.brand; b.dataset.en = c.texts.brand; } document.title = c.texts.brand; }
+    if (c.texts.subtitle){ TEXT_CFG.subtitle = c.texts.subtitle; const st = $('#subtitle'); if (st) st.textContent = c.texts.subtitle; }
   }
+  if (Array.isArray(c.templates) && c.templates.length){
+    TEMPLATES.length = 0;
+    c.templates.forEach(t => {
+      const nt = {id: t.id, name: t.name, size: t.size, w: t.w, d: t.d, custom: !!t.custom};
+      nt.make = nt.custom ? () => genRectTpl(nt.w, nt.d) : (BUILTIN_MAKE[nt.id] || (() => genRectTpl(nt.w || 3600, nt.d || 2400)));
+      TEMPLATES.push(nt);
+    });
+  }
+  if (c.palette){
+    ['cab','floor','wall','ceil'].forEach(k => { if (Array.isArray(c.palette[k]) && c.palette[k].length) PALETTE[k] = c.palette[k].slice(); });
+  }
+  if (c.sections){
+    if (c.sections.stats){ SEC_CFG.stats.hide = !!c.sections.stats.hide; SEC_CFG.stats.title = c.sections.stats.title || ''; }
+    if (c.sections.help){ SEC_CFG.help.hide = !!c.sections.help.hide; SEC_CFG.help.title = c.sections.help.title || ''; }
+  }
+  if (c.cases !== undefined) CASES_DATA = Array.isArray(c.cases) ? c.cases : null;
+  try{ renderPanel(); }catch(e){}
 }
-function toggleEditing(){
-  EDITING = !EDITING;
-  document.body.classList.toggle('editing', EDITING);
+function applyCustom(){ const c = loadCustom(); if (c) applyCustomData(c); }
+/* ======================= 管理员后台（隐藏入口：连点右下角版本号 5 次） ======================= */
+/* ======================= 好好厨房案例管理（随「发布到全员」同步） ======================= */
+let CASES_DATA = null;  // null = 好好厨房跟随内置示例；数组 = 已接管的全量案例
+const CASE_REGIONS = ['国内', '国外'];
+const CASE_LAYOUTS = ['一字型', 'L 型', 'U 型', '双排型', '岛台型'];
+const KITCHEN_DEMOS = [{"id": "demo-1", "title": "原木与留白，让备餐更从容", "region": "国内", "layout": "L 型", "people": [2, 3], "style": "自然原木", "area": "小至中等空间", "desc": "示例方案：沿相邻两侧布置操作台，将清洗、备餐与烹饪分区连接起来。日常用品留在顺手的位置，把台面留给操作。", "pros": "转角两侧分工明确；适合一人主厨、另一人辅助；抽屉可分类存放餐具与备餐工具。", "cons": "转角深处取物不便，需要匹配合适五金；多人集中在转角时容易相互干扰。", "storage": "餐具按用餐人数分组；常用工具放在备餐区抽屉；清洁用品集中在水槽附近。", "source": "", "media": [{"type": "image", "src": "assets/kitchen-0.jpg"}], "standby": true}, {"id": "demo-2", "title": "把动线拉直的小厨房", "region": "国内", "layout": "一字型", "people": [1, 2], "style": "简约实用", "area": "狭长空间", "desc": "示例方案：沿一侧墙布置厨柜，为走动和取物留出空间。以紧凑分区减少操作过程中的往返。", "pros": "分区容易理解，单人操作顺畅；柜体集中，清洁和整理较方便。", "cons": "备餐台面可能偏短；两人同时操作需要协调站位；储物量取决于墙面长度。", "storage": "常用物品按操作顺序排列；利用抽屉内分隔；避免墙面挂件侵占操作空间。", "source": "", "media": [{"type": "image", "src": "assets/kitchen-1.jpg"}], "standby": true}, {"id": "demo-3", "title": "三面环绕的家庭工作台", "region": "国内", "layout": "U 型", "people": [3, 4], "style": "温暖日常", "area": "较方正空间", "desc": "示例方案：三面台面承接清洗、备餐和烹饪，让工具与食材各就各位。是否适合需结合实际净宽及门窗位置判断。", "pros": "操作台面与储物位置较充足；不同工作区可分开安排。", "cons": "两处转角需要处理；中间通道偏窄时，多人操作和开抽屉容易冲突。", "storage": "依使用频率安排高低柜；重物优先放低位抽屉；为常用小电器预留使用与散热位置。", "source": "", "media": [{"type": "image", "src": "assets/kitchen-2.jpg"}], "standby": false}, {"id": "demo-4", "title": "围绕岛台，分享下厨的时光", "region": "国外", "layout": "岛台型", "people": [3, 4], "style": "开放社交", "area": "开阔空间", "desc": "示例方案：以岛台增加备餐与交流区域。国内落地前需核实排烟、燃气及实际空间条件。", "pros": "备餐与互动可以同时进行；适合一起准备食材与共享餐点。", "cons": "占用空间较多；油烟和清洁需要额外考虑；水电改动会增加施工复杂度。", "storage": "岛台按备餐、餐具分区；避免把就餐一侧变成杂物存放区；预留垃圾分类位置。", "source": "", "media": [{"type": "image", "src": "assets/kitchen-0.jpg"}], "standby": true}, {"id": "demo-5", "title": "两侧分工的高效料理间", "region": "国外", "layout": "双排型", "people": [2, 3, 4], "style": "清爽现代", "area": "长条形空间", "desc": "示例方案：将两侧柜体分别用于清洗备餐和烹饪收纳。合理的通道与柜门开启空间是关键。", "pros": "两侧可分配不同任务；储物和操作台面利用较充分。", "cons": "通道可能成为冲突点；两侧电器门同时开启时需要检查净空。", "storage": "按操作任务划分两侧物品；减少频繁横穿通道取物；高柜集中布置。", "source": "", "media": [{"type": "image", "src": "assets/kitchen-2.jpg"}], "standby": false}, {"id": "demo-6", "title": "少一点堆放，多一点日常", "region": "国外", "layout": "L 型", "people": [1, 2, 3], "style": "轻盈极简", "area": "小至中等空间", "desc": "示例方案：用连续台面与统一柜体组织空间，以少量开放收纳展示每日使用的器物。", "pros": "台面易整理；布局直观；少量展示收纳便于随手取用。", "cons": "开放区域容易积尘；物品较多的家庭需要增加封闭储物。", "storage": "开放架只放高频物品；其余物品进入抽屉；按日常用量安排备货。", "source": "", "media": [{"type": "image", "src": "assets/kitchen-1.jpg"}], "standby": false}];
+function parsePeople(s){ const a = String(s).split(/[^1-4]+/).map(Number).filter(n => n >= 1 && n <= 4); return [...new Set(a)].sort((x, y) => x - y); }
+function parseMedia(s){ return String(s).split(/\n+/).map(x => x.trim()).filter(Boolean).slice(0, 6).map(u => ({type: /\.(mp4|webm)(\?|#|$)/i.test(u) ? 'video' : 'image', src: u})); }
+
+const EDIT_PW = 'pdl2026';
+const ADMIN_ENV_OK = /Lark|Feishu/i.test(navigator.userAgent);
+const GH_REPO = 'fanfan0705/fanfan0705.github.io';
+const GH_PATH = 'kitchen-diy/custom.json';
+const TOKEN_KEY = 'kd_gh_token';
+function askEditPw(){
+  if (EDITING) return exitEditing();
+  if (!ADMIN_ENV_OK) return toast(tr('🔒 管理功能已锁定：请在飞书 App 内打开本平台进行修改','🔒 Admin is locked — open this app inside Feishu to manage'));
+  openCfg(tr('管理入口','Admin access'), [{id:'pw', label: tr('密码','Password'), value:'', type:'password'}], vals => {
+    if (String(vals.pw) === EDIT_PW) enterEditing();
+    else toast(tr('密码不对','Wrong password'));
+  });
+  setTimeout(() => $('#cf_pw')?.focus(), 80);
+}
+function enterEditing(){
+  EDITING = true;
+  document.body.classList.add('editing');
   buildLib(); syncBrandEdit();
-  if (EDITING) toast(tr('编辑模式：点任意家具项即可修改；改动自动保存在这台设备上', 'Edit mode on — tap any item to edit'));
+  toast(tr('已进入管理模式：改动先存本机，点「发布到全员」才更新线上','Admin mode — publish to go live'));
+}
+function exitEditing(){
+  EDITING = false;
+  document.body.classList.remove('editing');
+  buildLib(); syncBrandEdit();
+}
+async function pullSharedCustom(){
+  try{
+    const r = await fetch('custom.json?_=' + Date.now(), {cache:'no-store'});
+    if (!r.ok) return null;
+    const c = await r.json();
+    return (c && Array.isArray(c.lib) && c.lib.length) ? c : null;
+  }catch(_){ return null; }
+}
+function askToken(cb){
+  openCfg(tr('首次发布：粘贴 GitHub 密钥','GitHub token (one-time)'), [
+    {id:'tok', label: tr('密钥 Token','Token'), value:'', type:'password'},
+  ], vals => {
+    const t = String(vals.tok).trim(); if (!t) return;
+    try{ localStorage.setItem(TOKEN_KEY, t); }catch(e){}
+    toast(tr('密钥已保存在本机浏览器','Token saved on this device'));
+    cb && cb();
+  });
+  const h5 = $('#cfgEdit h5');
+  if (h5) h5.insertAdjacentHTML('afterend', `<div style="font-size:12px;color:#a39a8a;line-height:1.8;margin-bottom:10px">${tr(
+    '获取方法：GitHub 网页点头像 → Settings → 最底 Developer settings → Personal access tokens → Tokens (classic) → Generate new token (classic) → 勾选 repo → 生成并复制。密钥只存在你自己的浏览器里，用于把配置写回仓库。',
+    'GitHub → Settings → Developer settings → Personal access tokens (classic) → Generate with repo scope. Stored only in your browser.')}</div>`);
+}
+async function publishCustom(){
+  const tok = (() => { try{ return localStorage.getItem(TOKEN_KEY); }catch(e){ return null; } })();
+  if (!tok) return askToken(() => publishCustom());
+  toast(tr('正在发布到线上…','Publishing…'));
+  try{
+    const api = `https://api.github.com/repos/${GH_REPO}/contents/${GH_PATH}`;
+    const hdr = {Authorization: 'Bearer ' + tok, Accept: 'application/vnd.github+json'};
+    let sha;
+    const g = await fetch(api, {headers: hdr});
+    if (g.status === 401 || g.status === 403){ try{ localStorage.removeItem(TOKEN_KEY); }catch(e){} return toast(tr('密钥无效或已过期，请重新发布并输入新密钥','Token invalid — retry to re-enter')); }
+    if (g.ok) sha = (await g.json()).sha;
+    const body = { message: 'kitchen-diy: update custom.json',
+      content: btoa(unescape(encodeURIComponent(JSON.stringify(snapshotCustom(), null, 2)))) };
+    if (sha) body.sha = sha;
+    const p = await fetch(api, {method: 'PUT', headers: {...hdr, 'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    if (!p.ok){
+      if (p.status === 401 || p.status === 403){ try{ localStorage.removeItem(TOKEN_KEY); }catch(e){} }
+      return toast(tr('发布失败，错误码 ','Publish failed: ') + p.status);
+    }
+    saveCustom();
+    toast(tr('✓ 已发布！全员强刷页面后生效（约1-2分钟）','✓ Published — live in 1-2 min'));
+  }catch(e){ toast(tr('发布失败：网络异常','Network error')); }
+}
+async function resetShared(){
+  if (!confirm(tr('全员恢复默认？线上共享配置将被删除','Reset for EVERYONE?'))) return;
+  const tok = (() => { try{ return localStorage.getItem(TOKEN_KEY); }catch(e){ return null; } })();
+  try{ localStorage.removeItem(CUSTOM_KEY); }catch(e){}
+  if (tok){
+    try{
+      const api = `https://api.github.com/repos/${GH_REPO}/contents/${GH_PATH}`;
+      const hdr = {Authorization: 'Bearer ' + tok, Accept: 'application/vnd.github+json'};
+      const g = await fetch(api, {headers: hdr});
+      if (g.ok){
+        const sha = (await g.json()).sha;
+        await fetch(api, {method: 'DELETE', headers: {...hdr, 'Content-Type': 'application/json'},
+          body: JSON.stringify({message: 'kitchen-diy: remove custom.json', sha})});
+      }
+    }catch(e){}
+  }
+  toast(tr('已恢复默认','Reset done'));
+  setTimeout(() => location.reload(), 700);
 }
 function syncBrandEdit(){
   const b = document.querySelector('.brand b'), st = $('#subtitle');
@@ -2214,7 +2355,9 @@ function openCfg(title, fields, onSave, extra){
   const old = $('#cfgEdit'); if (old) old.remove();
   const box = document.createElement('div'); box.id = 'cfgEdit';
   box.innerHTML = `<h5>${title}</h5>` + fields.map(f =>
-    f.type === 'select'
+    f.type === 'textarea'
+      ? `<label style="flex-direction:column;align-items:stretch">${f.label} <textarea id="cf_${f.id}" rows="3">${esc(String(f.value))}</textarea></label>`
+      : f.type === 'select'
       ? `<label>${f.label} <select id="cf_${f.id}">${f.options.map(o => `<option value="${esc(o[0])}" ${o[0] === f.value ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select></label>`
       : f.type === 'color'
       ? `<label>${f.label} <input id="cf_${f.id}" type="color" value="${f.value}"></label>`
@@ -2273,13 +2416,173 @@ function delCategory(ci){
 }
 function editTexts(){
   openCfg(tr('页面文字','Texts'), [
-    {id:'brand', label: tr('品牌标题','Brand'), value: document.querySelector('.brand b')?.textContent || ''},
-    {id:'subtitle', label: tr('副标题','Subtitle'), value: $('#subtitle')?.textContent || ''},
+    {id:'brand', label: tr('品牌标题','Brand'), value: TEXT_CFG.brand || document.querySelector('.brand b')?.textContent || ''},
+    {id:'subtitle', label: tr('副标题（空户型时显示）','Subtitle'), value: TEXT_CFG.subtitle || ''},
   ], vals => {
     const b = document.querySelector('.brand b'), st = $('#subtitle');
-    if (b && String(vals.brand).trim()){ b.textContent = String(vals.brand).trim(); b.dataset.en = String(vals.brand).trim(); document.title = String(vals.brand).trim(); }
-    if (st) st.textContent = vals.subtitle;
+    if (b && String(vals.brand).trim()){ TEXT_CFG.brand = String(vals.brand).trim(); b.textContent = TEXT_CFG.brand; b.dataset.en = TEXT_CFG.brand; document.title = TEXT_CFG.brand; }
+    TEXT_CFG.subtitle = String(vals.subtitle).trim();
+    if (st && TEXT_CFG.subtitle) st.textContent = TEXT_CFG.subtitle;
     saveCustom(); toast(tr('已保存，本机立即生效','Saved locally'));
+  });
+}
+/* 列表型管理浮层 */
+function openList(title, html){
+  const old = $('#cfgEdit'); if (old) old.remove();
+  const box = document.createElement('div'); box.id = 'cfgEdit';
+  box.innerHTML = `<h5>${title}</h5>` + html + `<div class="row"><button class="cancel" id="cfClose">${tr('关闭','Close')}</button></div>`;
+  document.body.appendChild(box);
+  $('#cfClose').onclick = () => box.remove();
+  box.onkeydown = e => { e.stopPropagation(); if (e.key === 'Escape') box.remove(); };
+  return box;
+}
+/* 户型模板管理 */
+function editTemplates(){
+  const rows = TEMPLATES.map((t, i) => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+    <span style="flex:1;font-size:13px"><b>${esc(t.name)}</b> <small style="color:#a39a8a">${esc(t.size)}${t.custom ? ' · ' + tr('自定义','custom') : ''}</small></span>
+    <button class="mini" data-ted="${i}" style="border:0;background:none;color:#b5653a;font-size:14px;cursor:pointer;padding:4px 8px">✎</button>
+    <button class="mini" data-tdel="${i}" style="border:0;background:none;color:#b04a3a;font-size:14px;cursor:pointer;padding:4px 8px">✕</button>
+  </div>`).join('');
+  openList(tr('户型模板','Templates'), rows + `<button id="tAdd" style="width:100%;padding:9px;border:0;border-radius:8px;background:#b5653a;color:#fff;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px">${tr('＋ 新增户型','＋ Add template')}</button>`);
+  document.querySelectorAll('[data-ted]').forEach(b => b.onclick = () => editTemplateItem(+b.dataset.ted));
+  document.querySelectorAll('[data-tdel]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.tdel, t = TEMPLATES[i];
+    if (TEMPLATES.length <= 1) return toast(tr('至少保留一个户型','Keep at least one'));
+    if (!confirm(tr(`删除户型「${t.name}」？`, `Delete "${t.name}"?`))) return;
+    TEMPLATES.splice(i, 1);
+    saveCustom(); renderPanel(); editTemplates();
+  });
+  $('#tAdd').onclick = () => {
+    const t = {id: 'c' + Date.now(), name: tr('新户型','New layout'), size: '3600 × 2400', w: 3600, d: 2400, custom: true};
+    t.make = () => genRectTpl(t.w, t.d);
+    TEMPLATES.push(t);
+    saveCustom(); renderPanel();
+    editTemplateItem(TEMPLATES.length - 1);
+  };
+}
+function editTemplateItem(i){
+  const t = TEMPLATES[i]; if (!t) return;
+  openCfg(tr('编辑户型','Edit template'), [
+    {id:'name', label: tr('名称','Name'), value: t.name},
+    {id:'w', label: tr('净宽 (mm)','Width'), value: t.w || 3600, type:'number', num:true, attrs:'min="2000" max="9000" step="100"'},
+    {id:'d', label: tr('净深 (mm)','Depth'), value: t.d || 2400, type:'number', num:true, attrs:'min="1800" max="9000" step="100"'},
+  ], vals => {
+    const nm2 = String(vals.name).trim(); if (!nm2) return toast(tr('名称不能为空','Name required'));
+    const W = Math.max(2000, Math.min(9000, vals.w || 3600));
+    const D = Math.max(1800, Math.min(9000, vals.d || 2400));
+    t.name = nm2; t.w = W; t.d = D; t.size = `${W} × ${D}`;
+    if (t.custom || t.w0 === undefined || W !== t.w0 || D !== t.d0){
+      t.custom = true;
+      t.make = () => genRectTpl(W, D);
+    }
+    saveCustom(); renderPanel(); editTemplates();
+    toast(tr('已保存','Saved'));
+  });
+  const h5 = $('#cfgEdit h5');
+  if (h5) h5.insertAdjacentHTML('afterend', `<div style="font-size:12px;color:#a39a8a;line-height:1.7;margin-bottom:10px">${tr('改尺寸将按标准布局重建：顶墙居中窗 + 底墙居中门。内置户型原尺寸保存可保留原始门窗位置。','Resizing rebuilds with centered window & door.')}</div>`);
+}
+/* 配色色板管理 */
+const PAL_NAMES = [['cab','橱柜颜色'],['floor','地板颜色'],['wall','墙面颜色'],['ceil','吊顶颜色']];
+function editPalette(){
+  const html = PAL_NAMES.map(([k, n]) => `<div style="margin-bottom:13px"><div style="font-size:13px;font-weight:600;margin-bottom:5px">${n}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+      ${PALETTE[k].map((c, i) => `<button style="background:${c};width:26px;height:26px;border-radius:6px;border:1px solid rgba(0,0,0,.14);cursor:pointer" data-pk="${k}" data-pi="${i}" title="${tr('点击删除','Tap to delete')} ${c}"></button>`).join('')}
+      <input type="color" data-padd="${k}" value="#c8a97e" style="width:34px;height:26px;padding:1px;border:1px solid #d8d2c4;border-radius:6px;background:#fff;cursor:pointer">
+      <button data-paddbtn="${k}" style="border:0;background:none;color:#b5653a;font-size:16px;cursor:pointer;padding:2px 6px" title="${tr('把左边选的颜色加入','Add picked color')}">＋</button>
+    </div></div>`).join('') + `<div style="font-size:12px;color:#a39a8a;line-height:1.7">${tr('点色块删除；取色器选色后点＋添加。','Tap a swatch to delete; pick a color then ＋ to add.')}</div>`;
+  openList(tr('配色色板','Palettes'), html);
+  document.querySelectorAll('[data-pk]').forEach(b => b.onclick = () => {
+    const k = b.dataset.pk;
+    if (PALETTE[k].length <= 1) return toast(tr('至少保留一个颜色','Keep at least one'));
+    PALETTE[k].splice(+b.dataset.pi, 1);
+    saveCustom(); renderPanel(); editPalette();
+  });
+  document.querySelectorAll('[data-paddbtn]').forEach(b => b.onclick = () => {
+    const k = b.dataset.paddbtn;
+    const c = document.querySelector(`[data-padd="${k}"]`).value;
+    if (!PALETTE[k].includes(c)) PALETTE[k].push(c);
+    saveCustom(); renderPanel(); editPalette();
+  });
+}
+/* 面板区块管理 */
+function editSections(){
+  openCfg(tr('面板区块','Panel sections'), [
+    {id:'statsTitle', label: tr('统计区块标题','Stats title'), value: SEC_CFG.stats.title || ''},
+    {id:'statsShow', label: tr('方案统计','Plan stats'), value: SEC_CFG.stats.hide ? '0' : '1', type:'select', options: [['1', tr('显示','Show')], ['0', tr('隐藏','Hide')]]},
+    {id:'helpTitle', label: tr('操作说明标题','Help title'), value: SEC_CFG.help.title || ''},
+    {id:'helpShow', label: tr('操作说明（快捷键等）','Help / shortcuts'), value: SEC_CFG.help.hide ? '0' : '1', type:'select', options: [['1', tr('显示','Show')], ['0', tr('隐藏','Hide')]]},
+  ], vals => {
+    SEC_CFG.stats.title = String(vals.statsTitle).trim();
+    SEC_CFG.stats.hide = vals.statsShow === '0';
+    SEC_CFG.help.title = String(vals.helpTitle).trim();
+    SEC_CFG.help.hide = vals.helpShow === '0';
+    saveCustom(); renderPanel();
+    toast(tr('已保存','Saved'));
+  });
+  const h5 = $('#cfgEdit h5');
+  if (h5) h5.insertAdjacentHTML('afterend', `<div style="font-size:12px;color:#a39a8a;line-height:1.7;margin-bottom:10px">${tr('标题留空则使用默认文字。','Leave title empty for default.')}</div>`);
+}
+/* 好好厨房案例管理 */
+function editCases(){
+  if (CASES_DATA === null){
+    openList(tr('案例管理', 'Cases'), `<div style="font-size:13px;line-height:1.8;color:#6b6455;margin-bottom:10px">${tr('好好厨房当前展示内置的 6 个示例案例。接管后可在本面板自由增删改，点「📢 发布到全员」同步到好好厨房展示。','Good Kitchen shows 6 built-in demos. Take over to manage cases here and publish to everyone.')}</div>
+      <button id="caseTake" style="width:100%;padding:10px;border:0;border-radius:8px;background:#b5653a;color:#fff;font-size:13px;font-weight:600;cursor:pointer">${tr('🗂 接管案例管理（导入 6 个示例为起点）','🗂 Take over (import 6 demos)')}</button>
+      <button id="caseEmpty" style="width:100%;padding:9px;margin-top:6px;border:1px solid #d8d2c4;border-radius:8px;background:#fff;color:#6b6455;font-size:13px;cursor:pointer">${tr('从空白开始（示例全部下架）','Start empty (hide all demos)')}</button>`);
+    $('#caseTake').onclick = () => { CASES_DATA = JSON.parse(JSON.stringify(KITCHEN_DEMOS)); saveCustom(); editCases(); toast(tr('已接管，示例案例已导入', 'Taken over — demos imported')); };
+    $('#caseEmpty').onclick = () => { if (confirm(tr('确定从空白开始？发布后好好厨房将不再显示任何示例案例。','Start empty? All demos will be hidden after publish.'))){ CASES_DATA = []; saveCustom(); editCases(); } };
+    return;
+  }
+  const rows = CASES_DATA.map((c, i) => `<div style="display:flex;align-items:center;gap:4px;margin-bottom:8px">
+    <span style="flex:1;font-size:13px;min-width:0"><b>${esc(c.title)}</b><br><small style="color:#a39a8a">${esc(c.region)} · ${esc(c.layout)} · ${c.people.join('/')}人${c.standby ? ' · 🎠轮播' : ''}</small></span>
+    <button data-cup="${i}" style="border:0;background:none;color:#8a8378;font-size:13px;cursor:pointer;padding:4px 5px">↑</button>
+    <button data-cdn="${i}" style="border:0;background:none;color:#8a8378;font-size:13px;cursor:pointer;padding:4px 5px">↓</button>
+    <button data-ced="${i}" style="border:0;background:none;color:#b5653a;font-size:14px;cursor:pointer;padding:4px 6px">✎</button>
+    <button data-cdel="${i}" style="border:0;background:none;color:#b04a3a;font-size:14px;cursor:pointer;padding:4px 6px">✕</button>
+  </div>`).join('');
+  openList(tr(`案例管理（${CASES_DATA.length} 条）`, `Cases (${CASES_DATA.length})`), (rows || `<div style="font-size:13px;color:#a39a8a;padding:10px 0">${tr('还没有案例，点击下方新增。','No cases yet.')}</div>`)
+    + `<button id="cAdd" style="width:100%;padding:9px;border:0;border-radius:8px;background:#b5653a;color:#fff;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px">${tr('＋ 新增案例','＋ Add case')}</button>
+    <div style="font-size:12px;color:#a39a8a;line-height:1.7;margin-top:10px">${tr('图片/视频填 URL，每行一个（可先传到仓库 assets/ 文件夹，再引用 assets/xxx.jpg）；.mp4/.webm 自动识别为视频。改动需点「📢 发布到全员」才同步到好好厨房。','Media: one URL per line; .mp4/.webm = video. Publish to sync.')}</div>`);
+  document.querySelectorAll('[data-cup]').forEach(b => b.onclick = () => { const i = +b.dataset.cup; if (i > 0){ [CASES_DATA[i-1], CASES_DATA[i]] = [CASES_DATA[i], CASES_DATA[i-1]]; saveCustom(); editCases(); } });
+  document.querySelectorAll('[data-cdn]').forEach(b => b.onclick = () => { const i = +b.dataset.cdn; if (i < CASES_DATA.length - 1){ [CASES_DATA[i+1], CASES_DATA[i]] = [CASES_DATA[i], CASES_DATA[i+1]]; saveCustom(); editCases(); } });
+  document.querySelectorAll('[data-ced]').forEach(b => b.onclick = () => editCaseItem(+b.dataset.ced));
+  document.querySelectorAll('[data-cdel]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.cdel;
+    if (!confirm(tr(`删除案例「${CASES_DATA[i].title}」？`, `Delete "${CASES_DATA[i].title}"?`))) return;
+    CASES_DATA.splice(i, 1); saveCustom(); editCases();
+  });
+  $('#cAdd').onclick = () => {
+    CASES_DATA.push({id: 'case-' + Date.now(), title: tr('新案例','New case'), region: '国内', layout: 'L 型', people: [3], style: '', area: '', desc: '', pros: '', cons: '', storage: '', source: '', media: [{type:'image', src:'assets/kitchen-0.jpg'}], standby: false});
+    saveCustom();
+    editCaseItem(CASES_DATA.length - 1);
+  };
+}
+function editCaseItem(i){
+  const c = CASES_DATA[i]; if (!c) return;
+  openCfg(tr('编辑案例','Edit case'), [
+    {id:'title', label: tr('案例名称','Title'), value: c.title},
+    {id:'region', label: tr('分类','Region'), value: c.region, type:'select', options: CASE_REGIONS.map(r => [r, r])},
+    {id:'layout', label: tr('布局','Layout'), value: c.layout, type:'select', options: CASE_LAYOUTS.map(l => [l, l])},
+    {id:'people', label: tr('适合人数(1-4,逗号分隔)','People (1-4)'), value: c.people.join(',')},
+    {id:'style', label: tr('风格','Style'), value: c.style || ''},
+    {id:'area', label: tr('空间条件','Area'), value: c.area || ''},
+    {id:'desc', label: tr('方案介绍','Description'), value: c.desc || '', type:'textarea'},
+    {id:'pros', label: tr('优势','Pros'), value: c.pros || '', type:'textarea'},
+    {id:'cons', label: tr('限制/留意','Cons'), value: c.cons || '', type:'textarea'},
+    {id:'storage', label: tr('收纳建议','Storage'), value: c.storage || '', type:'textarea'},
+    {id:'source', label: tr('来源/授权说明','Source'), value: c.source || ''},
+    {id:'media', label: tr('图片/视频 URL（每行一个）','Media URLs (one per line)'), value: (c.media || []).map(m => m.src).join('\n'), type:'textarea'},
+    {id:'standby', label: tr('待机轮播','Standby'), value: c.standby ? '1' : '0', type:'select', options: [['1', tr('加入轮播','In slideshow')], ['0', tr('不轮播','Hidden')]]},
+  ], vals => {
+    const t2 = String(vals.title).trim(); if (!t2) return toast(tr('名称不能为空','Title required'));
+    const p2 = parsePeople(vals.people); if (!p2.length) return toast(tr('人数填 1-4 的数字，逗号分隔','People: numbers 1-4'));
+    const m2 = parseMedia(vals.media); if (!m2.length) return toast(tr('至少填一个图片/视频 URL','At least one media URL'));
+    c.title = t2; c.region = vals.region; c.layout = vals.layout; c.people = p2;
+    c.style = String(vals.style).trim() || '未分类'; c.area = String(vals.area).trim() || '待确认';
+    c.desc = String(vals.desc).trim(); c.pros = String(vals.pros).trim(); c.cons = String(vals.cons).trim();
+    c.storage = String(vals.storage).trim(); c.source = String(vals.source).trim();
+    c.media = m2; c.standby = vals.standby === '1';
+    saveCustom(); editCases();
+    toast(tr('已保存（发布后全员生效）','Saved (publish to sync)'));
   });
 }
 function exportCustom(){
@@ -2299,24 +2602,34 @@ function buildLib(){
   }).join('')}</div>`).join('') + `<div class="hint">${tr(
     `家具按真实尺寸（mm）绘制。${COARSE ? '点一下放到画面中央，或按住向右拖到平面图 / 3D 地面上的指定位置（上下滑动为滚动列表）。' : '点击添加到画面中央，或直接拖到平面图 / 3D 地面上。'}添加后可在右侧修改宽深与颜色。`,
     `Furniture is drawn at real size (mm). ${COARSE ? 'Tap to place at the center, or hold and drag right onto the plan / 3D floor (swipe up/down to scroll).' : 'Click to add at the center, or drag onto the plan / 3D floor.'} Edit size and color in the right panel afterwards.`)}</div>`
-  + `<button class="edToggle" id="edToggle">${EDITING ? tr('✓ 完成，退出编辑','✓ Done editing') : tr('⚙ 自定义文字和家具库','⚙ Customize content')}</button>`
   + (EDITING ? `<div class="edBar">
       <button id="edAddCat">${tr('＋ 添加分类','＋ Category')}</button>
       <button id="edTxt">${tr('改页面文字','Edit texts')}</button>
-      <button id="edExport">${tr('导出配置','Export')}</button>
-      <button id="edReset" class="warn">${tr('恢复默认','Reset')}</button>
+      <button id="edTpl">${tr('户型模板','Templates')}</button>
+      <button id="edPal">${tr('配色色板','Palettes')}</button>
+      <button id="edSec">${tr('面板区块','Sections')}</button>
+      <button id="edCase">${tr('案例管理','Cases')}</button>
+      <button id="edExport">${tr('导出备份','Export')}</button>
+      <button id="edPub" style="flex:1 1 100%;background:#b5653a;color:#fff;border-color:#b5653a">${tr('📢 发布到全员（线上更新）','📢 Publish to everyone')}</button>
+      <button id="edReset" class="warn">${tr('全员恢复默认','Reset all')}</button>
+      <button id="edDone">${tr('✓ 完成退出','✓ Done')}</button>
     </div>` : '');
   document.querySelectorAll('.item').forEach(el => el.addEventListener('pointerdown', e => {
     if (e.button) return;
     if (EDITING){ const [ci, ii] = el.dataset.key.split(':').map(Number); editLibItem(ci, ii); return; }
     libDrag = {el, id:e.pointerId, sx:e.clientX, sy:e.clientY, it:itemOf(el), ghost:null};
   }));
-  $('#edToggle').onclick = () => toggleEditing();
   if (EDITING){
     $('#edAddCat').onclick = () => addCategory();
     $('#edTxt').onclick = () => editTexts();
+    $('#edTpl').onclick = () => editTemplates();
+    $('#edPal').onclick = () => editPalette();
+    $('#edSec').onclick = () => editSections();
+    $('#edCase').onclick = () => editCases();
+    $('#edPub').onclick = () => publishCustom();
     $('#edExport').onclick = () => exportCustom();
-    $('#edReset').onclick = () => resetCustom();
+    $('#edReset').onclick = () => resetShared();
+    $('#edDone').onclick = () => exitEditing();
     document.querySelectorAll('[data-catadd]').forEach(b => b.onclick = () => addLibItem(+b.dataset.catadd));
     document.querySelectorAll('[data-catdel]').forEach(b => b.onclick = () => delCategory(+b.dataset.catdel));
   }
@@ -2607,6 +2920,14 @@ $('#langSel').onclick = e => { const l = e.target.closest('[data-lang]')?.datase
 applyStaticLang(); syncFullscreen();
 buildDefs(); buildLib(); renderOpenings(); renderDims();
 applyCustom();
+pullSharedCustom().then(c => { if (c) applyCustomData(c); });
+let _badgeTaps = 0, _badgeTimer = 0;
+$('#verBadge').addEventListener('pointerdown', () => {
+  _badgeTaps++;
+  clearTimeout(_badgeTimer);
+  _badgeTimer = setTimeout(() => _badgeTaps = 0, 1500);
+  if (_badgeTaps >= 5){ _badgeTaps = 0; askEditPw(); }
+});
 $('#tip').textContent = TIPS()['2d'];
 fitView(); renderAll();
 </script>
@@ -3811,6 +4132,6 @@ window.View3D = {enter, exit, relang, sync:() => sync(), shot, groundAt, flyToRo
     sync();
   }};
 </script>
-<div id="verBadge">v11.01h</div>
+<div id="verBadge">v11.05</div>
 </body>
 </html>
