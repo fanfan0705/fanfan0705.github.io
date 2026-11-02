@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#fffdf9">
-<title>厨房 DIY 设计 v11.01g</title>
+<title>厨房 DIY 设计 v11.01h</title>
 <style>
 :root{
   --bg:#f3efe7; --paper:#f7f4ee; --panel:#fffdf9; --line:#e3dccf; --ink:#2b2824; --muted:#8a8174;
@@ -261,6 +261,32 @@ main.drawer-panel #fab{opacity:0;visibility:hidden}
 #dimEdit.wallSpec label{font-size:12px;font-weight:500;color:#8a8378;display:flex;align-items:center;gap:4px;white-space:nowrap}
 #dimEdit.wallSpec input{width:66px;padding:6px;border:1px solid #d8d2c4;border-radius:7px;font-size:14px;font-weight:600;text-align:center;background:#fff;color:#3d3a34;outline:none}
 #dimEdit.wallSpec button{padding:7px 14px;border:0;border-radius:7px;background:#b5653a;color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+/* 自定义编辑模式 */
+.edToggle{margin:10px 0 0;width:100%;padding:9px;border:1.5px dashed #c8bfae;border-radius:9px;background:#faf8f3;color:#8a8378;font-size:13px;font-weight:600;cursor:pointer}
+.edToggle:hover{border-color:#b5653a;color:#b5653a}
+body.editing .edToggle{border-style:solid;border-color:#b5653a;background:#b5653a;color:#fff}
+body.editing .item{position:relative;cursor:pointer}
+body.editing .item::after{content:'✎';position:absolute;top:2px;right:4px;font-size:12px;color:#b5653a;font-style:normal}
+.catBar{display:flex;align-items:center;justify-content:space-between}
+.catBar h4{margin-bottom:0}
+.catBar .mini{border:0;background:none;color:#b5653a;font-size:14px;cursor:pointer;padding:2px 6px;border-radius:5px}
+.catBar .mini:hover{background:#f3e8dd}
+.edBar{margin-top:12px;padding-top:10px;border-top:1px dashed #d8d2c4;display:flex;flex-wrap:wrap;gap:6px}
+.edBar button{flex:1 1 45%;padding:8px 4px;border:1px solid #d8d2c4;border-radius:8px;background:#fff;color:#6b6455;font-size:12px;font-weight:600;cursor:pointer}
+.edBar button:hover{border-color:#b5653a;color:#b5653a}
+.edBar .warn{color:#b04a3a}
+#cfgEdit{position:fixed;z-index:100;left:50%;top:50%;transform:translate(-50%,-50%);width:min(320px,92vw);max-height:86vh;overflow:auto;background:#fffdf9;border:1.5px solid #b5653a;border-radius:14px;padding:16px;box-shadow:0 16px 50px rgba(61,58,52,.3)}
+#cfgEdit h5{margin:0 0 12px;font-size:15px;color:#3d3a34}
+#cfgEdit label{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;font-size:13px;color:#8a8378;gap:8px}
+#cfgEdit input[type=text],#cfgEdit input[type=number]{flex:1;min-width:0;padding:7px 9px;border:1px solid #d8d2c4;border-radius:7px;font-size:14px;background:#fff;color:#3d3a34;outline:none}
+#cfgEdit input[type=color]{width:52px;height:30px;padding:2px;border:1px solid #d8d2c4;border-radius:7px;background:#fff;cursor:pointer}
+#cfgEdit select{flex:1;padding:7px;border:1px solid #d8d2c4;border-radius:7px;font-size:13px;background:#fff;color:#3d3a34}
+#cfgEdit .row{display:flex;gap:8px;margin-top:12px}
+#cfgEdit .row button{flex:1;padding:9px;border:0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+#cfgEdit .ok{background:#b5653a;color:#fff}
+#cfgEdit .cancel{background:#eee9df;color:#6b6455}
+#cfgEdit .danger{background:#b04a3a;color:#fff}
+body.editing .brand b,body.editing #subtitle{cursor:pointer;outline:1px dashed #b5653a;outline-offset:2px;border-radius:3px}
 #verBadge{position:fixed;right:8px;bottom:6px;font-size:11px;color:#b8b2a6;z-index:98;pointer-events:none;font-family:monospace}
 #verNew{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:999;background:#b5653a;color:#fff;padding:9px 20px;border-radius:22px;font-size:13px;cursor:pointer;box-shadow:0 6px 20px rgba(61,58,52,.3)}
 </style>
@@ -278,7 +304,7 @@ main.drawer-panel #fab{opacity:0;visibility:hidden}
       <button class="btn chip" id="tgLib" data-en="◧ Library">◧ 家具库</button>
       <button class="btn chip" id="tgPanel" data-en="Properties ◨">属性 ◨</button>
     </div>
-    <div class="brand"><b data-en="Pangdonglai Appliance · Kitchen DIY">好好厨房DIY</b><span id="subtitle">厨房 DIY · 打造你的理想厨房 · 尺寸单位 mm</span></div>
+    <div class="brand"><b data-en="Pangdonglai Appliance · Kitchen DIY">胖东来电器 · 厨房DIY</b><span id="subtitle">厨房 DIY · 打造你的理想厨房 · 尺寸单位 mm</span></div>
     <div class="grp seg" id="viewSeg" title="切换 2D / 3D (T)" data-en-title="Switch 2D / 3D (T)">
       <span class="pill"></span>
       <button class="btn" data-view="2d" data-en="2D Plan">2D 平面</button>
@@ -353,7 +379,7 @@ main.drawer-panel #fab{opacity:0;visibility:hidden}
 
   <aside class="lib">
     <div id="lib3d" class="only3d">
-      <h4 data-en="Rooms · click to fly there">房间 · 点击回到该房间</h4>
+      <h4 data-en="Rooms · click to fly there">房间 · 点击飞到该房间</h4>
       <div id="roomList"></div>
     </div>
     <div id="lib"></div>
@@ -649,7 +675,7 @@ const snap = () => JSON.stringify(state);
 function commit(before){ undoStack.push(before); if (undoStack.length > 150) undoStack.shift(); redoStack.length = 0; save(); }
 function mutate(fn){ const b = snap(); fn(); commit(b); renderAll(); }
 // 版本号：每次发布新版递增；页面加载 3 秒后自检线上是否有更新（解决缓存旧版问题）
-const APP_VER = '11.01g';
+const APP_VER = '11.01h';
 setTimeout(async () => {
   try{
     const t = await (await fetch(location.pathname.replace(/[^/]*$/, '') + '?_v=' + Date.now(), {cache:'no-store'})).text();
@@ -2152,18 +2178,148 @@ document.addEventListener('keydown', e => {
 });
 
 /* ======================= 家具库 ======================= */
+/* ======================= 自定义内容（编辑模式，改完存本机 localStorage） ======================= */
+let EDITING = false;
+const CUSTOM_KEY = 'kd_custom_v1';
+const ICON_TYPES = [['basecab','地柜'],['wallcab','吊柜'],['tallcab','高柜'],['cornercab','转角柜'],['counter','台面'],['island','岛台'],['fridge','冰箱'],['stove','燃气灶'],['hood','油烟机'],['ksink','水槽'],['dishwasher','洗碗机'],['ovencol','蒸烤箱柜'],['oven','烤箱'],['microwave','微波炉'],['disinf','消毒柜'],['washer','洗衣机'],['dryer','烘干机'],['table','餐桌'],['roundtable','圆桌'],['chair','椅子'],['barstool','吧椅'],['cabinet','边柜'],['purifier','净化器'],['trashbin','垃圾桶'],['plant','绿植'],['opdoor','平开门'],['opwin','窗户'],['opslide','推拉门'],['rug','地毯']];
+const hex6 = c => /^#[0-9a-f]{3}$/i.test(c || '') ? '#' + [...c.slice(1)].map(x => x+x).join('') : c;
+function loadCustom(){ try{ const c = JSON.parse(localStorage.getItem(CUSTOM_KEY) || 'null'); return (c && Array.isArray(c.lib) && c.lib.length) ? c : null; }catch(_){ return null; } }
+function snapshotCustom(){
+  return { lib: LIB.map(c => ({cat: c.cat, items: c.items.map(it => it.slice())})),
+    texts: { brand: document.querySelector('.brand b')?.textContent || '', subtitle: $('#subtitle')?.textContent || '' } };
+}
+function saveCustom(){ try{ localStorage.setItem(CUSTOM_KEY, JSON.stringify(snapshotCustom())); }catch(e){} }
+function applyCustom(){
+  const c = loadCustom(); if (!c) return;
+  LIB.length = 0;
+  c.lib.forEach(cat => LIB.push({cat: cat.cat, items: cat.items.map(it => it.slice())}));
+  buildLib();
+  if (c.texts){
+    if (c.texts.brand){ const b = document.querySelector('.brand b'); if (b){ b.textContent = c.texts.brand; b.dataset.en = c.texts.brand; } document.title = c.texts.brand; }
+    if (c.texts.subtitle){ const st = $('#subtitle'); if (st) st.textContent = c.texts.subtitle; }
+  }
+}
+function toggleEditing(){
+  EDITING = !EDITING;
+  document.body.classList.toggle('editing', EDITING);
+  buildLib(); syncBrandEdit();
+  if (EDITING) toast(tr('编辑模式：点任意家具项即可修改；改动自动保存在这台设备上', 'Edit mode on — tap any item to edit'));
+}
+function syncBrandEdit(){
+  const b = document.querySelector('.brand b'), st = $('#subtitle');
+  [b, st].forEach(el => { if (el) el.onclick = EDITING ? () => editTexts() : null; });
+}
+/* 通用配置浮层 */
+function openCfg(title, fields, onSave, extra){
+  const old = $('#cfgEdit'); if (old) old.remove();
+  const box = document.createElement('div'); box.id = 'cfgEdit';
+  box.innerHTML = `<h5>${title}</h5>` + fields.map(f =>
+    f.type === 'select'
+      ? `<label>${f.label} <select id="cf_${f.id}">${f.options.map(o => `<option value="${esc(o[0])}" ${o[0] === f.value ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select></label>`
+      : f.type === 'color'
+      ? `<label>${f.label} <input id="cf_${f.id}" type="color" value="${f.value}"></label>`
+      : `<label>${f.label} <input id="cf_${f.id}" type="${f.type || 'text'}" value="${esc(String(f.value))}" ${f.attrs || ''}></label>`
+  ).join('') + `<div class="row">${extra || ''}<button class="cancel" id="cfCancel">${tr('取消','Cancel')}</button><button class="ok" id="cfOk">${tr('保存','Save')}</button></div>`;
+  document.body.appendChild(box);
+  $('#cfCancel').onclick = () => box.remove();
+  $('#cfOk').onclick = () => {
+    const vals = {};
+    fields.forEach(f => { const el = $('#cf_' + f.id); vals[f.id] = f.num ? Math.round(parseFloat(el.value)) : el.value; });
+    box.remove(); onSave(vals);
+  };
+  box.onkeydown = e => { e.stopPropagation(); if (e.key === 'Escape') box.remove(); };
+}
+function editLibItem(ci, ii){
+  const it = LIB[ci]?.items[ii]; if (!it) return;
+  openCfg(tr('编辑家具','Edit item'), [
+    {id:'name', label: tr('名称','Name'), value: it[1]},
+    {id:'w', label: tr('宽 (mm)','W (mm)'), value: it[2], type:'number', num:true, attrs:'min="50" step="10"'},
+    {id:'d', label: tr('深 (mm)','D (mm)'), value: it[3], type:'number', num:true, attrs:'min="50" step="10"'},
+    {id:'color', label: tr('颜色','Color'), value: hex6(it[4]), type:'color'},
+    {id:'type', label: tr('图标样式','Icon'), value: it[0], type:'select', options: ICON_TYPES.map(t => [t[0], t[1]])},
+    {id:'cat', label: tr('分类','Category'), value: String(ci), type:'select', options: LIB.map((c,i) => [String(i), c.cat])},
+  ], vals => {
+    if (!String(vals.name).trim()) return toast(tr('名称不能为空','Name required'));
+    it[0] = vals.type; it[1] = String(vals.name).trim();
+    it[2] = Math.max(50, vals.w || it[2]); it[3] = Math.max(50, vals.d || it[3]); it[4] = vals.color;
+    const nc = +vals.cat;
+    if (nc !== ci && LIB[nc]){ LIB[ci].items.splice(ii, 1); LIB[nc].items.push(it); }
+    saveCustom(); buildLib(); toast(tr('已保存，本机立即生效','Saved locally'));
+  }, `<button class="danger" id="cfDel">${tr('删除','Delete')}</button>`);
+  $('#cfDel').onclick = () => {
+    LIB[ci].items.splice(ii, 1);
+    $('#cfgEdit')?.remove();
+    saveCustom(); buildLib(); toast(tr('已删除','Deleted'));
+  };
+}
+function addLibItem(ci){
+  const c = LIB[ci]; if (!c) return;
+  c.items.push(['cabinet', tr('新家具','New item'), 600, 600, '#e9e5de']);
+  saveCustom(); buildLib();
+  editLibItem(ci, c.items.length - 1);
+}
+function addCategory(){
+  openCfg(tr('添加分类','Add category'), [{id:'name', label: tr('分类名','Name'), value: ''}], vals => {
+    const n = String(vals.name).trim(); if (!n) return;
+    LIB.push({cat: n, items: []});
+    saveCustom(); buildLib();
+  });
+}
+function delCategory(ci){
+  const c = LIB[ci]; if (!c) return;
+  if (!confirm(tr(`删除分类「${c.cat}」及其中 ${c.items.length} 个家具？`, `Delete "${c.cat}"?`))) return;
+  LIB.splice(ci, 1);
+  saveCustom(); buildLib();
+}
+function editTexts(){
+  openCfg(tr('页面文字','Texts'), [
+    {id:'brand', label: tr('品牌标题','Brand'), value: document.querySelector('.brand b')?.textContent || ''},
+    {id:'subtitle', label: tr('副标题','Subtitle'), value: $('#subtitle')?.textContent || ''},
+  ], vals => {
+    const b = document.querySelector('.brand b'), st = $('#subtitle');
+    if (b && String(vals.brand).trim()){ b.textContent = String(vals.brand).trim(); b.dataset.en = String(vals.brand).trim(); document.title = String(vals.brand).trim(); }
+    if (st) st.textContent = vals.subtitle;
+    saveCustom(); toast(tr('已保存，本机立即生效','Saved locally'));
+  });
+}
+function exportCustom(){
+  download(tr('厨房DIY_自定义配置', 'kitchen-custom') + '.json', new Blob([JSON.stringify(snapshotCustom(), null, 2)], {type:'application/json'}));
+  toast(tr('已导出配置文件，发给 Yamato 即可同步到全员线上版','Exported — send it to Yamato to publish'));
+}
+function resetCustom(){
+  if (!confirm(tr('恢复默认内容？这台设备上的自定义将清空','Reset to defaults?'))) return;
+  try{ localStorage.removeItem(CUSTOM_KEY); }catch(e){}
+  location.reload();
+}
 function buildLib(){
-  $('#lib').innerHTML = LIB.map((c,ci) => `<h4>${nm(c.cat)}</h4><div class="lib-grid">${c.items.map((it,ii) => {
+  $('#lib').innerHTML = LIB.map((c,ci) => `${EDITING ? `<div class="catBar"><h4>${esc(c.cat)}</h4><span><button class="mini" data-catadd="${ci}" title="${tr('在此分类下添加家具','Add item')}">＋</button><button class="mini" data-catdel="${ci}" title="${tr('删除此分类','Delete category')}">✕</button></span></div>` : `<h4>${nm(c.cat)}</h4>`}<div class="lib-grid">${c.items.map((it,ii) => {
     const [t,n,w,d,col] = it, pad = Math.max(w,d)*.08;
-    return `<div class="item" data-key="${ci}:${ii}" title="${tr('点击添加，或拖到平面图中的指定位置', 'Click to add, or drag onto the plan')}">
+    return `<div class="item" data-key="${ci}:${ii}" title="${EDITING ? tr('点击编辑','Click to edit') : tr('点击添加，或拖到平面图中的指定位置', 'Click to add, or drag onto the plan')}">
       <svg viewBox="${-w/2-pad} ${-d/2-pad} ${w+2*pad} ${d+2*pad}">${furnSVG(t,w,d,col)}</svg><b>${esc(nm(n))}</b><small>${w}×${d}</small></div>`;
   }).join('')}</div>`).join('') + `<div class="hint">${tr(
     `家具按真实尺寸（mm）绘制。${COARSE ? '点一下放到画面中央，或按住向右拖到平面图 / 3D 地面上的指定位置（上下滑动为滚动列表）。' : '点击添加到画面中央，或直接拖到平面图 / 3D 地面上。'}添加后可在右侧修改宽深与颜色。`,
-    `Furniture is drawn at real size (mm). ${COARSE ? 'Tap to place at the center, or hold and drag right onto the plan / 3D floor (swipe up/down to scroll).' : 'Click to add at the center, or drag onto the plan / 3D floor.'} Edit size and color in the right panel afterwards.`)}</div>`;
+    `Furniture is drawn at real size (mm). ${COARSE ? 'Tap to place at the center, or hold and drag right onto the plan / 3D floor (swipe up/down to scroll).' : 'Click to add at the center, or drag onto the plan / 3D floor.'} Edit size and color in the right panel afterwards.`)}</div>`
+  + `<button class="edToggle" id="edToggle">${EDITING ? tr('✓ 完成，退出编辑','✓ Done editing') : tr('⚙ 自定义文字和家具库','⚙ Customize content')}</button>`
+  + (EDITING ? `<div class="edBar">
+      <button id="edAddCat">${tr('＋ 添加分类','＋ Category')}</button>
+      <button id="edTxt">${tr('改页面文字','Edit texts')}</button>
+      <button id="edExport">${tr('导出配置','Export')}</button>
+      <button id="edReset" class="warn">${tr('恢复默认','Reset')}</button>
+    </div>` : '');
   document.querySelectorAll('.item').forEach(el => el.addEventListener('pointerdown', e => {
     if (e.button) return;
+    if (EDITING){ const [ci, ii] = el.dataset.key.split(':').map(Number); editLibItem(ci, ii); return; }
     libDrag = {el, id:e.pointerId, sx:e.clientX, sy:e.clientY, it:itemOf(el), ghost:null};
   }));
+  $('#edToggle').onclick = () => toggleEditing();
+  if (EDITING){
+    $('#edAddCat').onclick = () => addCategory();
+    $('#edTxt').onclick = () => editTexts();
+    $('#edExport').onclick = () => exportCustom();
+    $('#edReset').onclick = () => resetCustom();
+    document.querySelectorAll('[data-catadd]').forEach(b => b.onclick = () => addLibItem(+b.dataset.catadd));
+    document.querySelectorAll('[data-catdel]').forEach(b => b.onclick = () => delCategory(+b.dataset.catdel));
+  }
 }
 const itemOf = el => { const [ci, ii] = el.dataset.key.split(':').map(Number); return LIB[ci].items[ii]; };
 
@@ -2450,6 +2606,7 @@ $('#langSel').onclick = e => { const l = e.target.closest('[data-lang]')?.datase
 
 applyStaticLang(); syncFullscreen();
 buildDefs(); buildLib(); renderOpenings(); renderDims();
+applyCustom();
 $('#tip').textContent = TIPS()['2d'];
 fitView(); renderAll();
 </script>
@@ -3654,6 +3811,6 @@ window.View3D = {enter, exit, relang, sync:() => sync(), shot, groundAt, flyToRo
     sync();
   }};
 </script>
-<div id="verBadge">v11.01g</div>
+<div id="verBadge">v11.01h</div>
 </body>
 </html>
